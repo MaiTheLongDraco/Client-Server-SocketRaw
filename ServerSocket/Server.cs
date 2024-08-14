@@ -1,4 +1,5 @@
-﻿using System;
+﻿using ClientSocket;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
@@ -38,7 +39,9 @@ namespace ServerSocket
 				 client= _listener.EndAccept(ar);
 				Console.WriteLine($" client {client.RemoteEndPoint} connected to server ....");
 				_listener.BeginAccept(OnAcceptCLient, null);
-				Send(Hello);
+				ST_DATA_TRANFER sT_DATA_TRANFER= default( ST_DATA_TRANFER );
+				sT_DATA_TRANFER.DataString = Hello;
+				Send(sT_DATA_TRANFER);
 				byte[] buffer = new byte[1024];
 				client.BeginReceive(buffer, 0, buffer.Length, SocketFlags.None, OnReceiveFromClient, client);
 			
@@ -52,9 +55,17 @@ namespace ServerSocket
 				Stop();
 			}
 		}
-		private static void Send(string message) { 
-			byte[] buffer = Encoding.UTF8.GetBytes(message);
-			client.BeginSend(buffer, 0, buffer.Length, SocketFlags.None, OnSendDataToCLient, null);
+		//private static void Send(string message) { 
+		//	byte[] buffer = Encoding.UTF8.GetBytes(message);
+		//	client.BeginSend(buffer, 0, buffer.Length, SocketFlags.None, OnSendDataToCLient, null);
+		//}
+		private static void Send(object data)
+		{
+			byte[] output = new byte[1024];
+			int size = 0;
+			AppMath.ConvertStructeToByteArr(data, ref size, ref output);
+			client.BeginSend(output, 0, output.Length, SocketFlags.None, OnSendDataToCLient, null);
+		
 		}
 
 		private static void OnSendDataToCLient(IAsyncResult ar)

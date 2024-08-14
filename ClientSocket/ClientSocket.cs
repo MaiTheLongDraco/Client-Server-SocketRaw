@@ -56,9 +56,17 @@ namespace ClientSocket
 			int byteRead = request.EndReceive(ar);
 			if (byteRead > 0)
 			{
-				string data = Encoding.UTF8.GetString(dataReceiveBuffer);
-				Console.WriteLine($"message from server {data}");
-				request.BeginReceive(dataReceiveBuffer, 0, dataReceiveBuffer.Length, SocketFlags.None, OnReceiveCallBack, null);
+				ST_DATA_TRANFER sT_DATA_TRANFER = default (ST_DATA_TRANFER);
+				AppMath.ConvertByteArrToStructure(dataReceiveBuffer, byteRead, ref sT_DATA_TRANFER);
+				//Console.WriteLine("receive data success");
+				StringBuilder sb= new StringBuilder();
+				sb.AppendLine(sT_DATA_TRANFER.DataInt.ToString());
+				sb.AppendLine(sT_DATA_TRANFER.DataUshort.ToString());
+				sb.AppendLine(sT_DATA_TRANFER.DataBool.ToString());
+				sb.AppendLine(sT_DATA_TRANFER.DataString.ToString());
+				//sb.AppendLine(sT_DATA_TRANFER.DataByteArr.Count().ToString());
+				Console.WriteLine($"message from server {sb.ToString()}");
+				request.BeginReceive(dataReceiveBuffer, 0, byteRead, SocketFlags.None, OnReceiveCallBack, null);
 			}
 		}
 	}
