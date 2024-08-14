@@ -50,5 +50,11 @@
   <ItemGroup>
     <None Include="App.config" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\ClientSocket\ClientSocket.csproj">
+      <Project>{69bfef4f-eab2-406a-a412-0d938646ad53}</Project>
+      <Name>ClientSocket</Name>
+    </ProjectReference>
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

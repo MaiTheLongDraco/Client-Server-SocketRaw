@@ -43,9 +43,11 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="AppMath.cs" />
     <Compile Include="ClientSocket.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="ST_DATA_TRANFER.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
