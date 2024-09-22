@@ -41,10 +41,6 @@ namespace ServerSocket
 				allClient.Add(client);
 				Console.WriteLine($" client {client.RemoteEndPoint} connected to server ....");
 				_listener.BeginAccept(OnAcceptCLient, null);
-				ST_DATA_TRANFER sT_DATA_TRANFER = default(ST_DATA_TRANFER);
-				sT_DATA_TRANFER.DataString = $"new client enter server with endpoint {client.RemoteEndPoint}";
-				//Send(sT_DATA_TRANFER);
-				SendBroadcast(sT_DATA_TRANFER);
 				byte[] buffer = new byte[1024];
 				client.BeginReceive(buffer, 0, buffer.Length, SocketFlags.None, OnReceiveFromClient, client);
 			
@@ -136,7 +132,7 @@ namespace ServerSocket
 				{
 					ST_DATA_TRANFER sT_DATA_TRANFER= default(ST_DATA_TRANFER);
 					AppMath.ConvertByteArrToStructure(data, byteSend, ref sT_DATA_TRANFER);
-					Console.WriteLine($"Send data success to client with {sT_DATA_TRANFER.ToString()} ");
+					//Console.WriteLine($"Send data success to client with {sT_DATA_TRANFER.ToString()} ");
 				}
 			}catch(SocketException ex)
 			{

@@ -26,7 +26,7 @@ namespace ClientSocket
 				if (size <= 0) return;
 				IntPtr ptr = Marshal.AllocHGlobal(size);
 				Marshal.Copy(input, 0, ptr, size);
-				output = (T)Marshal.PtrToStructure(ptr, output.GetType());
+				output = Marshal.PtrToStructure<T>(ptr);
 				Marshal.FreeHGlobal(ptr);
 			}
 			catch

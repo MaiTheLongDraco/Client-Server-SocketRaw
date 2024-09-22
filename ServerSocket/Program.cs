@@ -12,7 +12,9 @@ namespace ServerSocket
 		public static int Port = 1234;
 		static void Main(string[] args)
 		{
-			Server.Start(Host, Port,50);
+		//	Server.Start(Host, Port,50);
+		ServerUsingTCPListener server= new ServerUsingTCPListener();
+			server.Start();
 		}
 	}
 }

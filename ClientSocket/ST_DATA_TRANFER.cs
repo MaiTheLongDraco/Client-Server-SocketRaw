@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace ClientSocket
 {
-	[StructLayout(LayoutKind.Sequential)]
+	[StructLayout(LayoutKind.Sequential,Pack =1)]
 	public struct ST_DATA_TRANFER
 	{
 		public uint DataInt;
