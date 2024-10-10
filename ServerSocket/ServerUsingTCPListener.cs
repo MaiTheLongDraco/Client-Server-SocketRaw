@@ -130,15 +130,6 @@ namespace ServerSocket
 
         private void BroadCast(string message, TcpClient excludeClient)
         {
-            // byte[] buffer = Encoding.UTF8.GetBytes(message);
-            // foreach (var client in clients.Values)
-            // {
-            //     if (client != excludeClient)
-            //     {
-            //         NetworkStream stream = client.GetStream();
-            //         stream.Write(buffer, 0, buffer.Length);
-            //     }
-            // }
             var broadcastMessage = new ProtocolMessage<string>
             {
                 ProtocolType = (int)ServerToClientProtocol.GetMessageResponse,
@@ -239,7 +230,7 @@ namespace ServerSocket
         }
     }
 
-    public class MessageDTO
+    public struct MessageDTO
     {
         public string SenderId { get; set; }
         public string Content { get; set; }
@@ -247,7 +238,7 @@ namespace ServerSocket
     }
 
 // ProtocolMessage.cs
-    public class ProtocolMessage<T>
+    public struct ProtocolMessage<T>
     {
         public int ProtocolType { get; set; }
         public T Data { get; set; }
