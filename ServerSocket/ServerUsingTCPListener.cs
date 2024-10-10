@@ -34,105 +34,99 @@ namespace ServerSocket
             }
         }
 
-        private static void SendMessage<T>(NetworkStream stream, ProtocolMessage<T> message)
+        private  void SendMessage<T>(NetworkStream stream, ProtocolMessage<T> message)
         {
             string json = JsonConvert.SerializeObject(message);
             byte[] buffer = Encoding.UTF8.GetBytes(json + "\n");
             stream.Write(buffer, 0, buffer.Length);
         }
 
-        private void HandleClient(object clientObj)
+        private  void HandleClient(object clientObj)
+    {
+        TcpClient client = (TcpClient)clientObj;
+        NetworkStream stream = client.GetStream();
+        byte[] buffer = new byte[4096];
+        int byteCount;
+        string clientId = null;
+
+        try
         {
-            TcpClient client = (TcpClient)clientObj;
-            NetworkStream stream = client.GetStream();
-            byte[] buffer = new byte[1024];
-            int byteCount;
-            string clientId = null;
+            // Bước 1: Gán ID cho client
+            clientId = GenerateClientId();
+            Console.WriteLine($"Assigning ID {clientId} to new client.");
 
-            try
+            // Thêm client vào Dictionary
+            lock (_lockObj)
             {
-                // Bước 1: Gán ID cho client
-                clientId = GenerateClientId();
-                Console.WriteLine($"Assigning ID {clientId} to new client.");
-
-                // Thêm client vào Dictionary
-                lock (_lockObj)
-                {
-                    clients.Add(clientId, client);
-                }
-
-                // Bước 2: Gửi ID cho client
-                var assignIdMessage = new ProtocolMessage<string>
-                {
-                    ProtocolType = (int)ServerToClientProtocol.GetMessageResponse,
-                    Data = clientId
-                };
-                SendMessage(stream, assignIdMessage);
-                Console.WriteLine($"Sent assigned ID {clientId} to client.");
-
-                // Bước 3: Thông báo cho tất cả client khác rằng có client mới kết nối
-                BroadCast($"{clientId} ", clients[clientId]);
-
-                // Bước 4: Lắng nghe tin nhắn từ client
-                while ((byteCount = stream.Read(buffer, 0, buffer.Length)) > 0)
-                {
-                    string message = Encoding.UTF8.GetString(buffer, 0, byteCount).Trim();
-                    Console.WriteLine($"Received from {clientId}: {message}");
-
-                    // Kiểm tra xem có lệnh gửi đến một client cụ thể hay không
-                    if (message.StartsWith("SEND_TO:"))
-                    {
-                        // Định dạng: SEND_TO:ClientX:Tin nhắn
-                        string[] splitMessage = message.Split(new char[] { ':' }, 3);
-                        if (splitMessage.Length == 3)
-                        {
-                            string targetId = splitMessage[1];
-                            string actualMessage = splitMessage[2];
-                            MessageDTO messageDto = new MessageDTO()
-                            {
-                                SenderId = clientId,
-                                Content = $"{clientId}: {actualMessage}",
-                                Timestamp = DateTime.Now
-                            };
-                            SendMessageToSpecificClient(targetId, messageDto);
-                        }
-                    }
-                    else
-                    {
-                        // Phát tin nhắn đến tất cả các client khác
-                        BroadCast($"{clientId} : {message}", clients[clientId]);
-                    }
-                }
+                clients.Add(clientId, client);
             }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error with client {clientId ?? "Unknown"}: {ex.Message}");
-            }
-            finally
-            {
-                if (clientId != null)
-                {
-                    lock (_lockObj)
-                    {
-                        if (clients.ContainsKey(clientId))
-                        {
-                            clients.Remove(clientId);
-                            // Thông báo cho tất cả client khác rằng client đã ngắt kết nối
-                            BroadCast($"{clientId} đã ngắt kết nối.", clients[clientId]);
-                        }
-                    }
-                }
 
-                client.Close();
-                Console.WriteLine($"Client {clientId ?? "Unknown"} disconnected.");
+            // Bước 2: Gửi ID cho client
+            var assignIdMessage = new ProtocolMessage<string>
+            {
+                ProtocolType = (int)ServerToClientOperationCode.GetMessageResponse,
+                Data = clientId
+            };
+            SendMessage(stream, assignIdMessage);
+            Console.WriteLine($"Sent assigned ID {clientId} to client.");
+
+            // Bước 3: Thông báo cho tất cả client khác rằng có client mới kết nối
+            BroadCast($"{clientId} đã kết nối.", clients[clientId]);
+
+            // Bước 4: Lắng nghe tin nhắn từ client
+            while ((byteCount = stream.Read(buffer, 0, buffer.Length)) > 0)
+            {
+                string receivedData = Encoding.UTF8.GetString(buffer, 0, byteCount).Trim();
+                Console.WriteLine($"Received from {clientId}: {receivedData}");
+
+                // Deserialize ProtocolMessage từ JSON
+                var protocolMessage = JsonConvert.DeserializeObject<ProtocolMessage<object>>(receivedData);
+
+                switch ((ClientToServerOperationCode)protocolMessage.ProtocolType)
+                {
+                    case ClientToServerOperationCode.GetMessage:
+                        HandleGetMessage(clientId, stream);
+                        break;
+
+                    case ClientToServerOperationCode.SendMessage:
+                        HandleSendMessage(clientId, protocolMessage.Data);
+                        break;
+
+                    // Thêm các case khác nếu cần
+                    default:
+                        Console.WriteLine($"Unknown protocol type: {protocolMessage.ProtocolType}");
+                        break;
+                }
             }
         }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error with client {clientId ?? "Unknown"}: {ex.Message}");
+        }
+        finally
+        {
+            if (clientId != null)
+            {
+                lock (_lockObj)
+                {
+                    if (clients.ContainsKey(clientId))
+                    {
+                        clients.Remove(clientId);
+                        // Thông báo cho tất cả client khác rằng client đã ngắt kết nối
+                        BroadCast($"{clientId} đã ngắt kết nối.", clients[clientId]);
+                    }
+                }
+            }
+            client.Close();
+            Console.WriteLine($"Client {clientId ?? "Unknown"} disconnected.");
+        }
+    }
 
         private void BroadCast(string message, TcpClient excludeClient)
         {
             var broadcastMessage = new ProtocolMessage<string>
             {
-                ProtocolType = (int)ServerToClientProtocol.GetMessageResponse,
+                ProtocolType = (int)ServerToClientOperationCode.GetMessageResponse,
                 Data = message
             };
 
@@ -183,7 +177,7 @@ namespace ServerSocket
                     NetworkStream stream = client.GetStream();
                     var protocolMessage = new ProtocolMessage<MessageDTO>
                     {
-                        ProtocolType = (int)ServerToClientProtocol.GetMessageResponse,
+                        ProtocolType = (int)ServerToClientOperationCode.GetMessageResponse,
                         Data = messageDTO
                     };
                     SendMessage(stream, protocolMessage);
@@ -208,7 +202,7 @@ namespace ServerSocket
 
             var protocolMessage = new ProtocolMessage<MessageDTO>
             {
-                ProtocolType = (int)ServerToClientProtocol.GetMessageResponse,
+                ProtocolType = (int)ServerToClientOperationCode.GetMessageResponse,
                 Data = messageDTO
             };
 
@@ -244,19 +238,19 @@ namespace ServerSocket
         public T Data { get; set; }
     }
 
-// ClientToServerProtocol.cs
-    public enum ClientToServerProtocol
+    public enum ServerToClientOperationCode
+    {
+        UpdatePlayerId=0,
+        GetMessageResponse = 1,
+        MessageReceived = 2,
+        // Thêm các operation code khác nếu cần
+    }
+
+// ClientToServerOperationCode.cs
+    public enum ClientToServerOperationCode
     {
         GetMessage = 1,
         SendMessage = 2,
-        // Thêm các protocol khác nếu cần
-    }
-
-// ServerToClientProtocol.cs
-    public enum ServerToClientProtocol
-    {
-        GetMessageResponse = 1,
-        MessageReceived = 2,
-        // Thêm các protocol khác nếu cần
+        // Thêm các operation code khác nếu cần
     }
 }
