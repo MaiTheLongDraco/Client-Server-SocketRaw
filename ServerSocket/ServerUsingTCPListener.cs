@@ -14,7 +14,7 @@ namespace ServerSocket
     public class ServerUsingTCPListener
     {
         TcpListener listener;
-        public int port = 8343;
+        public int port = 1234;
         public string host = "127.0.0.1";
         public Dictionary<string, TcpClient> clients = new Dictionary<string, TcpClient>();
         private object _lockObj = new object();
@@ -64,7 +64,7 @@ namespace ServerSocket
             // Bước 2: Gửi ID cho client
             var assignIdMessage = new ProtocolMessage<string>
             {
-                ProtocolType = (int)ServerToClientOperationCode.GetMessageResponse,
+                ProtocolType = (int)ServerToClientOperationCode.UpdatePlayerId,
                 Data = clientId
             };
             SendMessage(stream, assignIdMessage);
@@ -111,9 +111,9 @@ namespace ServerSocket
                 {
                     if (clients.ContainsKey(clientId))
                     {
-                        clients.Remove(clientId);
-                        // Thông báo cho tất cả client khác rằng client đã ngắt kết nối
-                        BroadCast($"{clientId} đã ngắt kết nối.", clients[clientId]);
+							// Thông báo cho tất cả client khác rằng client đã ngắt kết nối
+							BroadCast($"{clientId} đã ngắt kết nối.", clients[clientId]);
+							clients.Remove(clientId);
                     }
                 }
             }
