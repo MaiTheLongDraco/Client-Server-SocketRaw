@@ -69,9 +69,13 @@ namespace ServerSocket
             };
             SendMessage(stream, assignIdMessage);
             Console.WriteLine($"Sent assigned ID {clientId} to client.");
-
+            PublicMessageDTO publicMessageDto = new PublicMessageDTO()
+            {
+                SenderId = clientId,
+                Content = $"{clientId} đã kết nối."
+            };
             // Bước 3: Thông báo cho tất cả client khác rằng có client mới kết nối
-            BroadCast($"{clientId} đã kết nối.", clients[clientId]);
+            BroadCast(publicMessageDto, clients[clientId]);
 
             // Bước 4: Lắng nghe tin nhắn từ client
             while ((byteCount = stream.Read(buffer, 0, buffer.Length)) > 0)
@@ -112,8 +116,13 @@ namespace ServerSocket
                 {
                     if (clients.ContainsKey(clientId))
                     {
+                        PublicMessageDTO publicMessageDto = new PublicMessageDTO()
+                        {
+                            SenderId = clientId,
+                            Content = $"{clientId} đã ngắt kết nối."
+                        };
 							// Thông báo cho tất cả client khác rằng client đã ngắt kết nối
-							BroadCast($"{clientId} đã ngắt kết nối.", clients[clientId]);
+							BroadCast(publicMessageDto, clients[clientId]);
 							clients.Remove(clientId);
                     }
                 }
@@ -122,12 +131,11 @@ namespace ServerSocket
             Console.WriteLine($"Client {clientId ?? "Unknown"} disconnected.");
         }
     }
-
-        private void BroadCast(string message, TcpClient excludeClient)
+        private void BroadCast(PublicMessageDTO message, TcpClient excludeClient)
         {
-            var broadcastMessage = new ProtocolMessage<string>
+            var broadcastMessage = new ProtocolMessage<PublicMessageDTO>
             {
-                ProtocolType = (int)ServerToClientOperationCode.GetMessageResponse,
+                ProtocolType = (int)ServerToClientOperationCode.MessageReceived,
                 Data = message
             };
 
@@ -221,7 +229,7 @@ namespace ServerSocket
             Console.WriteLine($"Processing SendMessage from {clientId}: {messageDTO.Content}");
 
             // Ví dụ: Phát tin nhắn này cho tất cả các client khác
-            BroadCast($"{messageDTO.SenderName}: {messageDTO.Content}", clients[clientId]);
+            BroadCast(messageDTO, clients[clientId]);
         }
         private void HandleClientSendPrivateMessage(object data)
         {
