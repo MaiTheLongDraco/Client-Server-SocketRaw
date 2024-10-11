@@ -85,13 +85,14 @@ namespace ServerSocket
                 switch ((ClientToServerOperationCode)protocolMessage.ProtocolType)
                 {
                     case ClientToServerOperationCode.GetMessage:
-                        HandleGetMessage(clientId, stream);
+                        // HandleGetMessage(clientId, stream);
                         break;
-
                     case ClientToServerOperationCode.SendMessage:
-                        HandleSendMessage(clientId, protocolMessage.Data);
+                        HandleClientSendPublicMessage(clientId, protocolMessage.Data);
                         break;
-
+                    case ClientToServerOperationCode.SendPrivateMessage:
+                        HandleClientSendPrivateMessage(protocolMessage.Data);
+                        break;
                     // Thêm các case khác nếu cần
                     default:
                         Console.WriteLine($"Unknown protocol type: {protocolMessage.ProtocolType}");
@@ -167,7 +168,7 @@ namespace ServerSocket
             }
         }
 
-        private void SendMessageToSpecificClient(string clientId, MessageDTO messageDTO)
+        private void SendMessageToSpecificClient(string clientId, PrivateMessageDTO messageDTO)
         {
             lock (_lockObj)
             {
@@ -175,7 +176,7 @@ namespace ServerSocket
                 {
                     TcpClient client = clients[clientId];
                     NetworkStream stream = client.GetStream();
-                    var protocolMessage = new ProtocolMessage<MessageDTO>
+                    var protocolMessage = new ProtocolMessage<PrivateMessageDTO>
                     {
                         ProtocolType = (int)ServerToClientOperationCode.GetMessageResponse,
                         Data = messageDTO
@@ -210,17 +211,29 @@ namespace ServerSocket
             Console.WriteLine($"Sent GetMessage response to {clientId}.");
         }
 
-        private void HandleSendMessage(string clientId, object data)
+        private void HandleClientSendPublicMessage(string clientId, object data)
         {
             // Giả sử data là một chuỗi JSON chứa MessageDTO
             var messageJson = data.ToString();
-            var messageDTO = JsonConvert.DeserializeObject<MessageDTO>(messageJson);
+            var messageDTO = JsonConvert.DeserializeObject<PublicMessageDTO>(messageJson);
 
             // Xử lý tin nhắn (ví dụ: lưu vào cơ sở dữ liệu, phát lại cho các client khác, v.v.)
             Console.WriteLine($"Processing SendMessage from {clientId}: {messageDTO.Content}");
 
             // Ví dụ: Phát tin nhắn này cho tất cả các client khác
-            BroadCast($"{messageDTO.SenderId}: {messageDTO.Content}", clients[clientId]);
+            BroadCast($"{messageDTO.SenderName}: {messageDTO.Content}", clients[clientId]);
+        }
+        private void HandleClientSendPrivateMessage(object data)
+        {
+            // Giả sử data là một chuỗi JSON chứa MessageDTO
+            var messageJson = data.ToString();
+            var messageDTO = JsonConvert.DeserializeObject<PrivateMessageDTO>(messageJson);
+
+            // Xử lý tin nhắn (ví dụ: lưu vào cơ sở dữ liệu, phát lại cho các client khác, v.v.)
+            Console.WriteLine($"Processing SendMessage from {messageDTO.SenderId}: {messageDTO.Content}");
+
+            // Ví dụ: Phát tin nhắn này cho tất cả các client khác
+            SendMessageToSpecificClient(messageDTO.SenderId,messageDTO);
         }
     }
 
@@ -230,7 +243,28 @@ namespace ServerSocket
         public string Content { get; set; }
         public DateTime Timestamp { get; set; }
     }
-
+    public struct PublicMessageDTO
+    {
+        public string SenderId { get; set; }
+        public string SenderName { get; set; }
+        public string Content { get; set; }
+        public int EmojiIndex { get; set; }
+        public DateTime Timestamp { get; set; }
+        public override string ToString()
+        {
+            return
+                $"SenderID {SenderId} SenderName {SenderName} Content {Content} EmojiIndex {EmojiIndex} TimeSend {Timestamp.ToString()}";
+        }
+    }
+    public struct PrivateMessageDTO
+    {
+        public string SenderId { get; set; }
+        public string SenderName { get; set; }
+        public string TargetID { get; set; }
+        public string Content { get; set; }
+        public int EmojiIndex { get; set; }
+        public DateTime Timestamp { get; set; }
+    }
 // ProtocolMessage.cs
     public struct ProtocolMessage<T>
     {
@@ -250,11 +284,11 @@ namespace ServerSocket
         // Thêm các operation code khác nếu cần
     }
 
-// ClientToServerOperationCode.cs
     public enum ClientToServerOperationCode
     {
         GetMessage = 1,
         SendMessage = 2,
+        SendPrivateMessage = 3,
         // Thêm các operation code khác nếu cần
     }
 }
