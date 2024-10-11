@@ -69,13 +69,6 @@ namespace ServerSocket
             };
             SendMessage(stream, assignIdMessage);
             Console.WriteLine($"Sent assigned ID {clientId} to client.");
-            PublicMessageDTO publicMessageDto = new PublicMessageDTO()
-            {
-                SenderId = clientId,
-                Content = $"{clientId} đã kết nối."
-            };
-            // Bước 3: Thông báo cho tất cả client khác rằng có client mới kết nối
-            BroadCast(publicMessageDto, clients[clientId]);
 
             // Bước 4: Lắng nghe tin nhắn từ client
             while ((byteCount = stream.Read(buffer, 0, buffer.Length)) > 0)
@@ -96,6 +89,9 @@ namespace ServerSocket
                         break;
                     case ClientToServerOperationCode.SendPrivateMessage:
                         HandleClientSendPrivateMessage(protocolMessage.Data);
+                        break; 
+                    case ClientToServerOperationCode.NotifyNewPlayer:
+                        NotiFyNewUser(protocolMessage.Data, client);
                         break;
                     // Thêm các case khác nếu cần
                     default:
@@ -131,11 +127,54 @@ namespace ServerSocket
             Console.WriteLine($"Client {clientId ?? "Unknown"} disconnected.");
         }
     }
+        
         private void BroadCast(PublicMessageDTO message, TcpClient excludeClient)
         {
             var broadcastMessage = new ProtocolMessage<PublicMessageDTO>
             {
                 ProtocolType = (int)ServerToClientOperationCode.MessageReceived,
+                Data = message
+            };
+
+            string json = JsonConvert.SerializeObject(broadcastMessage) + "\n";
+            byte[] buffer = Encoding.UTF8.GetBytes(json);
+
+            lock (_lockObj)
+            {
+                foreach (var clientPair in clients)
+                {
+                    string id = clientPair.Key;
+                    TcpClient client = clientPair.Value;
+                    if (client != excludeClient)
+                    {
+                        try
+                        {
+                            NetworkStream stream = client.GetStream();
+                            if (stream.CanWrite)
+                            {
+                                stream.Write(buffer, 0, buffer.Length);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"Error broadcasting to {id}: {ex.Message}");
+                        }
+                    }
+                }
+            }
+        }
+
+        private void NotiFyNewUser(object data,TcpClient excludeClient)
+        {
+            var messageJson = data.ToString();
+            var messageDTO = JsonConvert.DeserializeObject<NotifyNewPlayerDTO>(messageJson);
+            BroadCastNewUser(messageDTO,excludeClient);
+        }
+        private void BroadCastNewUser(NotifyNewPlayerDTO message, TcpClient excludeClient)
+        {
+            var broadcastMessage = new ProtocolMessage<NotifyNewPlayerDTO>
+            {
+                ProtocolType = (int)ServerToClientOperationCode.NotifyNewPlayer,
                 Data = message
             };
 
@@ -273,6 +312,12 @@ namespace ServerSocket
         public int EmojiIndex { get; set; }
         public DateTime Timestamp { get; set; }
     }
+    public struct NotifyNewPlayerDTO
+    {
+        public string SenderId { get; set; }
+        public string SenderName { get; set; }
+        public string Content { get; set; }
+    }
 // ProtocolMessage.cs
     public struct ProtocolMessage<T>
     {
@@ -289,6 +334,8 @@ namespace ServerSocket
         UpdatePlayerId=0,
         GetMessageResponse = 1,
         MessageReceived = 2,
+        NotifyNewPlayer=3
+
         // Thêm các operation code khác nếu cần
     }
 
@@ -297,6 +344,8 @@ namespace ServerSocket
         GetMessage = 1,
         SendMessage = 2,
         SendPrivateMessage = 3,
+        NotifyNewPlayer=4
         // Thêm các operation code khác nếu cần
     }
+   
 }
