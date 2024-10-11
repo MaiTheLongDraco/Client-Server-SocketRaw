@@ -62,10 +62,10 @@ namespace ServerSocket
             }
 
             // Bước 2: Gửi ID cho client
-            var assignIdMessage = new ProtocolMessage<string>
+            var assignIdMessage = new ProtocolMessage<ClientIdDto>
             {
                 ProtocolType = (int)ServerToClientOperationCode.UpdatePlayerId,
-                Data = clientId
+                Data = new ClientIdDto(){Id = clientId}
             };
             SendMessage(stream, assignIdMessage);
             Console.WriteLine($"Sent assigned ID {clientId} to client.");
@@ -238,6 +238,10 @@ namespace ServerSocket
         public T Data { get; set; }
     }
 
+    public struct ClientIdDto
+    {
+        public string Id;
+    }
     public enum ServerToClientOperationCode
     {
         UpdatePlayerId=0,
