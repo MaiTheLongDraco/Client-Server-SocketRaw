@@ -12,10 +12,10 @@ using Newtonsoft.Json;
 namespace ServerSocket
 {
     public class ServerUsingTCPListener
-    {
+    {//192.168.100.170
         TcpListener listener;
-        public int port = 1234;
-        public string host = "127.0.0.1";
+        public int port = 5000;
+        public string host = "192.168.100.170";
         public Dictionary<string, TcpClient> clients = new Dictionary<string, TcpClient>();
         private object _lockObj = new object();
         private int _clientCounter = 0; // Biến đếm để tạo ID duy nhất
@@ -280,7 +280,7 @@ namespace ServerSocket
             Console.WriteLine($"Processing SendMessage from {messageDTO.SenderId}: {messageDTO.Content}");
 
             // Ví dụ: Phát tin nhắn này cho tất cả các client khác
-            SendMessageToSpecificClient(messageDTO.SenderId,messageDTO);
+            SendMessageToSpecificClient(messageDTO.TargetID,messageDTO);
         }
     }
 
