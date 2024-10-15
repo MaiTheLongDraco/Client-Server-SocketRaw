@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Net;
+using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
@@ -22,7 +23,7 @@ namespace ServerSocket
 
         public void Start()
         {
-            IPAddress iPAddress = IPAddress.Parse(host);
+            IPAddress iPAddress = IPAddress.Parse(GetLocalIPv4Address());
             listener = new TcpListener(iPAddress, port);
             listener.Start();
             Console.WriteLine($"Server is starting ");
@@ -33,7 +34,28 @@ namespace ServerSocket
                 clientThread.Start(client);
             }
         }
+        
+        private string GetLocalIPv4Address()
+        {
+            foreach (NetworkInterface ni in NetworkInterface.GetAllNetworkInterfaces())
+            {
+                // Bỏ qua các interface không hoạt động hoặc là loopback
+                if (ni.OperationalStatus != OperationalStatus.Up ||
+                    ni.NetworkInterfaceType == NetworkInterfaceType.Loopback)
+                    continue;
 
+                var ipProperties = ni.GetIPProperties();
+
+                foreach (UnicastIPAddressInformation ip in ipProperties.UnicastAddresses)
+                {
+                    if (ip.Address.AddressFamily == AddressFamily.InterNetwork)
+                    {
+                        return ip.Address.ToString();
+                    }
+                }
+            }
+            return null;
+        }
         private  void SendMessage<T>(NetworkStream stream, ProtocolMessage<T> message)
         {
             string json = JsonConvert.SerializeObject(message);
