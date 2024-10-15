@@ -115,6 +115,9 @@ namespace ServerSocket
                     case ClientToServerOperationCode.NotifyNewPlayer:
                         NotiFyNewUser(protocolMessage.Data, client);
                         break;
+                    case ClientToServerOperationCode.SendAudio:
+                        HandleClientSendVoiceMessage(protocolMessage.Data);
+                        break;
                     // Thêm các case khác nếu cần
                     default:
                         Console.WriteLine($"Unknown protocol type: {protocolMessage.ProtocolType}");
@@ -149,7 +152,9 @@ namespace ServerSocket
             Console.WriteLine($"Client {clientId ?? "Unknown"} disconnected.");
         }
     }
-        
+
+     
+
         private void BroadCast(PublicMessageDTO message, TcpClient excludeClient)
         {
             var broadcastMessage = new ProtocolMessage<PublicMessageDTO>
@@ -185,7 +190,41 @@ namespace ServerSocket
                 }
             }
         }
+        private void BroadCastVoice(VoiceMessagePack message, TcpClient excludeClient)
+        {
+            var broadcastMessage = new ProtocolMessage<VoiceMessagePack>
+            {
+                ProtocolType = (int)ServerToClientOperationCode.AudioReceived,
+                Data = message
+            };
 
+            string json = JsonConvert.SerializeObject(broadcastMessage) + "\n";
+            byte[] buffer = Encoding.UTF8.GetBytes(json);
+
+            lock (_lockObj)
+            {
+                foreach (var clientPair in clients)
+                {
+                    string id = clientPair.Key;
+                    TcpClient client = clientPair.Value;
+                    if (client != excludeClient)
+                    {
+                        try
+                        {
+                            NetworkStream stream = client.GetStream();
+                            if (stream.CanWrite)
+                            {
+                                stream.Write(buffer, 0, buffer.Length);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"Error broadcasting to {id}: {ex.Message}");
+                        }
+                    }
+                }
+            }
+        }
         private void NotiFyNewUser(object data,TcpClient excludeClient)
         {
             var messageJson = data.ToString();
@@ -304,6 +343,38 @@ namespace ServerSocket
             // Ví dụ: Phát tin nhắn này cho tất cả các client khác
             SendMessageToSpecificClient(messageDTO.TargetID,messageDTO);
         }
+
+        private void HandleClientSendVoiceMessage(object data)
+        {
+            var messageJson = data.ToString();
+            var messageDto = JsonConvert.DeserializeObject<VoiceMessagePack>(messageJson);
+            if (messageDto.TargetId != String.Empty)
+            {
+                lock (_lockObj)
+                {
+                    if (clients.ContainsKey(messageDto.TargetId))
+                    {
+                        TcpClient client = clients[messageDto.TargetId];
+                        NetworkStream stream = client.GetStream();
+                        var protocolMessage = new ProtocolMessage<VoiceMessagePack>
+                        {
+                            ProtocolType = (int)ServerToClientOperationCode.AudioReceived,
+                            Data = messageDto
+                        };
+                        SendMessage(stream, protocolMessage);
+                        Console.WriteLine($"Sent to {messageDto.TargetId}: {messageDto.SenderName} voice data count {messageDto.ByteData.Length}");
+                    }
+                    else
+                    {
+                        Console.WriteLine($"Client {messageDto.TargetId} not found.");
+                    }
+                }
+            }
+            else
+            {
+                BroadCastVoice(messageDto, clients[messageDto.SenderId]);
+            }
+        }
     }
 
     public struct MessageDTO
@@ -351,13 +422,20 @@ namespace ServerSocket
     {
         public string Id;
     }
+    public struct VoiceMessagePack
+    {
+        public string SenderId { get; set; }
+        public string TargetId { get; set; }
+        public string SenderName { get; set; }
+        public byte[] ByteData { get; set; }
+    }
     public enum ServerToClientOperationCode
     {
         UpdatePlayerId=0,
         GetMessageResponse = 1,
         MessageReceived = 2,
-        NotifyNewPlayer=3
-
+        NotifyNewPlayer=3,
+        AudioReceived=4
         // Thêm các operation code khác nếu cần
     }
 
@@ -366,7 +444,8 @@ namespace ServerSocket
         GetMessage = 1,
         SendMessage = 2,
         SendPrivateMessage = 3,
-        NotifyNewPlayer=4
+        NotifyNewPlayer=4,
+        SendAudio=5
         // Thêm các operation code khác nếu cần
     }
    
