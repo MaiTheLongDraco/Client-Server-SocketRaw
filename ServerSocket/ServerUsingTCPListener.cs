@@ -12,6 +12,9 @@ using Newtonsoft.Json;
 
 namespace ServerSocket
 {
+    /// <summary>
+    /// Server sử dụng Tcp listener để lắng nghe và tcpClient để giao tiếp
+    /// </summary>
     public class ServerUsingTCPListener
     {//192.168.100.170
         TcpListener listener;
@@ -23,18 +26,27 @@ namespace ServerSocket
 
         public void Start()
         {
+            //Khởi tạo địa chỉ ip
             IPAddress iPAddress = IPAddress.Parse(GetLocalIPv4Address());
+            // lắng nghe trên ip và port
             listener = new TcpListener(iPAddress, port);
+            //bắt đầu lắng nghe kết nối
             listener.Start();
             Console.WriteLine($"Server is starting ");
             while (true)
             {
+                // khi có client kết nối đến
                 TcpClient client = listener.AcceptTcpClient();
+                // tạo  luồng riêng để xử lý cho từng client
                 Thread clientThread = new Thread(HandleClient);
                 clientThread.Start(client);
             }
         }
         
+        /// <summary>
+        /// Lấy địa chỉ Ip của máy
+        /// </summary>
+        /// <returns></returns>
         private string GetLocalIPv4Address()
         {
             foreach (NetworkInterface ni in NetworkInterface.GetAllNetworkInterfaces())
@@ -56,13 +68,24 @@ namespace ServerSocket
             }
             return null;
         }
+        /// <summary>
+        /// Hàm này gửi lại tin nhắn cho client 
+        /// </summary>
+        /// <param name="stream"></param>
+        /// <param name="message"></param>
+        /// <typeparam name="T"></typeparam>
         private  void SendMessage<T>(NetworkStream stream, ProtocolMessage<T> message)
         {
+            // đóng gói dữ liệu thành json
             string json = JsonConvert.SerializeObject(message);
+            // chuyển json thành byte
             byte[] buffer = Encoding.UTF8.GetBytes(json + "\n");
             stream.Write(buffer, 0, buffer.Length);
         }
-
+/// <summary>
+/// Xử lý client
+/// </summary>
+/// <param name="clientObj"></param>
         private  void HandleClient(object clientObj)
     {
         TcpClient client = (TcpClient)clientObj;
@@ -107,12 +130,15 @@ namespace ServerSocket
                         // HandleGetMessage(clientId, stream);
                         break;
                     case ClientToServerOperationCode.SendMessage:
+                        // xử lý public message
                         HandleClientSendPublicMessage(clientId, protocolMessage.Data);
                         break;
                     case ClientToServerOperationCode.SendPrivateMessage:
+                        // xử lý private message
                         HandleClientSendPrivateMessage(protocolMessage.Data);
                         break; 
                     case ClientToServerOperationCode.NotifyNewPlayer:
+                        // thông báo có user mới connect
                         NotiFyNewUser(protocolMessage.Data, client);
                         break;
                     case ClientToServerOperationCode.SendAudio:
@@ -154,7 +180,11 @@ namespace ServerSocket
     }
 
      
-
+/// <summary>
+/// Hàm gửi tất cả cho các connecting client
+/// </summary>
+/// <param name="message"></param>
+/// <param name="excludeClient"></param>
         private void BroadCast(PublicMessageDTO message, TcpClient excludeClient)
         {
             var broadcastMessage = new ProtocolMessage<PublicMessageDTO>
@@ -225,6 +255,11 @@ namespace ServerSocket
                 }
             }
         }
+        /// <summary>
+        /// Hàm thông báo user mới kết nói
+        /// </summary>
+        /// <param name="data"></param>
+        /// <param name="excludeClient"></param>
         private void NotiFyNewUser(object data,TcpClient excludeClient)
         {
             var messageJson = data.ToString();
@@ -266,7 +301,10 @@ namespace ServerSocket
                 }
             }
         }
-
+/// <summary>
+/// Tạo key cho từng client
+/// </summary>
+/// <returns></returns>
         private string GenerateClientId()
         {
             lock (_lockObj)
@@ -275,7 +313,11 @@ namespace ServerSocket
                 return $"{_clientCounter}";
             }
         }
-
+/// <summary>
+/// Hàm send message cho user cụ thể
+/// </summary>
+/// <param name="clientId"></param>
+/// <param name="messageDTO"></param>
         private void SendMessageToSpecificClient(string clientId, PrivateMessageDTO messageDTO)
         {
             lock (_lockObj)
@@ -318,7 +360,11 @@ namespace ServerSocket
             SendMessage(stream, protocolMessage);
             Console.WriteLine($"Sent GetMessage response to {clientId}.");
         }
-
+/// <summary>
+///  Hàm xử lý gói tin public từ client
+/// </summary>
+/// <param name="clientId"></param>
+/// <param name="data"></param>
         private void HandleClientSendPublicMessage(string clientId, object data)
         {
             // Giả sử data là một chuỗi JSON chứa MessageDTO
@@ -331,6 +377,10 @@ namespace ServerSocket
             // Ví dụ: Phát tin nhắn này cho tất cả các client khác
             BroadCast(messageDTO, clients[clientId]);
         }
+/// <summary>
+/// Hàm xử lý gói tin private từ client
+/// </summary>
+/// <param name="data"></param>
         private void HandleClientSendPrivateMessage(object data)
         {
             // Giả sử data là một chuỗi JSON chứa MessageDTO
@@ -377,6 +427,7 @@ namespace ServerSocket
         }
     }
 
+    #region Data tranfer object define
     public struct MessageDTO
     {
         public string SenderId { get; set; }
@@ -429,6 +480,11 @@ namespace ServerSocket
         public string SenderName { get; set; }
         public byte[] ByteData { get; set; }
     }
+
+    #endregion
+
+    #region Định nghĩa xử lý gói tin nào
+
     public enum ServerToClientOperationCode
     {
         UpdatePlayerId=0,
@@ -448,5 +504,8 @@ namespace ServerSocket
         SendAudio=5
         // Thêm các operation code khác nếu cần
     }
+
+    #endregion
+   
    
 }
